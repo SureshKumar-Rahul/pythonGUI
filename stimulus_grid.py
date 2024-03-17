@@ -1,5 +1,6 @@
 # stimulus_grid.py
 import random
+import sys
 import time
 from PyQt5.QtWidgets import QWidget, QLabel, QGridLayout, QApplication
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal, QSize
@@ -11,11 +12,14 @@ class StimulusGrid(QWidget):
     highlighting_started = pyqtSignal()
     highlighting_finished = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, selected_letter, selected_highlight, selected_round):
         super().__init__()
         self.labels = None
         self.stimuli = None
         self.grid = None
+        self.selected_letter = selected_letter
+        self.selected_highlight = selected_highlight
+        self.selected_round = selected_round
         self.initUI()
 
     def initUI(self):
@@ -44,7 +48,8 @@ class StimulusGrid(QWidget):
         desktop = QApplication.desktop()  # Get desktop widget
         taskbar_height = desktop.height() - desktop.availableGeometry().height()  # Calculate height of the taskbar
         self.setGeometry(0, 0, desktop.screenGeometry().width(),
-                         desktop.screenGeometry().height() - taskbar_height)  # Set window geometry to screen size minus taskbar height
+                         desktop.screenGeometry().height() - taskbar_height)  # Set window geometry to screen size
+        # minus taskbar height
         self.show()
 
         self.timer = QTimer(self)
@@ -56,18 +61,24 @@ class StimulusGrid(QWidget):
 
     def highlight_random_location(self):
         self.highlighting_started.emit()  # Emit signal when highlighting starts
+        # Define how many times the target label should be highlighted more than the others
+        times_to_highlight = self.selected_highlight  # Adjust this number as needed
 
+        # Define the label you want to highlight more often
+        selected_label = [label for label in self.labels if label.text() == self.selected_letter][0]
+        shuffled_labels = [selected_label] * times_to_highlight + [label for label in self.labels if
+                                                                   label != selected_label]
+
+        # Shuffle the list of labels
+        random.shuffle(shuffled_labels)
+        total_round = self.selected_round
         # Repeat the highlighting process for three rounds
-        for round_num in range(3):
-            # Reset all labels to default style
-            for label in self.labels:
-                label.setStyleSheet('color: white')
-
+        for round_num in range(total_round):
             # Shuffle the list of labels
-            random.shuffle(self.labels)
+            random.shuffle(shuffled_labels)
 
             # Highlight all labels with a delay of 1 second between each highlight
-            for label in self.labels:
+            for label in shuffled_labels:
                 label.setStyleSheet('color: red')
                 time.sleep(1)  # Wait for 1 second
                 QApplication.processEvents()  # Process pending events to update UI
@@ -77,4 +88,12 @@ class StimulusGrid(QWidget):
 
     def resizeEvent(self, event):
         for label in self.labels:
-            label.setFont(QFont("Arial", 80) if event.oldSize().height() < event.size().height() else QFont("Arial", 80))
+            label.setFont(
+                QFont("Arial", 80) if event.oldSize().height() < event.size().height() else QFont("Arial", 80))
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    stimulus_grid = StimulusGrid('A', 1, 1)
+    stimulus_grid.showMinimized()
+    sys.exit(app.exec_())
