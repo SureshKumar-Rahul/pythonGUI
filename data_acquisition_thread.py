@@ -39,7 +39,7 @@ class DataAcquisitionThread(QThread):
                 while self._running:
                     data = self.board.get_current_board_data(256)
                     for i in range(len(data[0])):
-                        row = [data[channel][i] for channel in range(32)]
+                        row = [str(float(data[channel][i])) for channel in range(32)]  # Convert to float first, then to string
                         row.append(self.letter)  # Append the same letter for each row
                         writer.writerow(row)
 
