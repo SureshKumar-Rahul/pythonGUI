@@ -58,7 +58,7 @@ class StimulusGrid(QWidget):
             self.timer.timeout.connect(self.highlight_random_location_sc)
         else:
             self.timer.timeout.connect(self.highlight_random_location_rc)
-        self.timer.start(1000)  # Update every 1000 ms (1 second)
+        self.timer.start(1)  # Update every 1000 ms (1 second)
 
     def closeEvent(self, event):
         self.closing_signal.emit()
@@ -67,59 +67,73 @@ class StimulusGrid(QWidget):
         # Define the label you want to highlight more often
         selected_label = [label for label in self.labels if label.text() == self.selected_letter][0]
         selected_index = self.labels.index(selected_label)
-        times_to_highlight = self.selected_highlight - 1
+        times_to_highlight = self.selected_highlight
 
         # Calculate the row and column indices
-        row_index = selected_index // 6  # Integer division to get the row index
-        col_index = selected_index % 6  # Modulo operator to get the column index
+        selected_row_index = selected_index // 6  # Integer division to get the row index
+        selected_col_index = selected_index % 6  # Modulo operator to get the column index
+        print(f"selected_row_index = {selected_row_index} \nselected_col_index = {selected_col_index} \n")
 
         # Create a list of rows and columns
         rows = list(range(6))
         cols = list(range(6))
 
-        # Increase row_index and col_index by times_to_highlight and add them to the rows and cols lists
-        rows += [row_index] * times_to_highlight
-        cols += [col_index] * times_to_highlight
-
-        prev_row_index = None
-        prev_col_index = None
-
-        for _ in range(self.selected_round):
+        for round in range(self.selected_round):
+            print(f"Round {round}")
             # Shuffle the order of rows and columns separately
             random.shuffle(rows)
             random.shuffle(cols)
+            i = 0
+            prev_row_index = None
+            prev_col_index = None
+            no_of_appearance = 0
+            length = len(rows) + len(cols)
+            row_index = random.randint(0, 5)
+            col_index = random.randint(0, 5)
+            print(length)
+            while no_of_appearance < times_to_highlight:
+                for i in range(length):
+                    for label in self.labels:
+                        label.setStyleSheet('color: white')
 
-            for _ in range(len(rows) + len(cols)):
-                for label in self.labels:
-                    label.setStyleSheet('color: white')
+                    # Highlight the row or column
+                    if i % 2 == 0:
+                        # Ensure that the row index is different from the previous one
+                        while (row_index == selected_row_index and prev_col_index == selected_col_index) or (
+                                row_index == prev_row_index and col_index == prev_col_index):
+                            row_index = random.randint(0, 5)
+                        prev_row_index = row_index
+                        if row_index == selected_row_index:
+                            if no_of_appearance >= times_to_highlight:
+                                break
+                            else:
+                                no_of_appearance += 1
 
-                # Highlight the row or column
-                if _ % 2 == 0:
-                    # Highlight the row
-                    row_index = rows.pop() if rows else random.randint(0, 5)
-                    # Ensure that the row index is different from the previous one
-                    while row_index == prev_row_index or row_index == prev_col_index:
-                        row_index = rows.pop() if rows else random.randint(0, 5)
-                    prev_row_index = row_index
+                        for k in range(6):
+                            if self.labels[row_index * 6 + k] == selected_label:
+                                self.labels[row_index * 6 + k].setStyleSheet('color: yellow')
+                            else:
+                                self.labels[row_index * 6 + k].setStyleSheet('color: red')
 
-                    for i in range(6):
-                        self.labels[row_index * 6 + i].setStyleSheet(
-                            'color: yellow' if self.labels[row_index * 6 + i] == selected_label else 'color: red')
-                else:
-                    # Highlight the column
-                    col_index = cols.pop() if cols else random.randint(0, 5)
-                    # Ensure that the column index is different from the previous one
-                    while col_index == prev_col_index or col_index == prev_row_index:
-                        col_index = cols.pop() if cols else random.randint(0, 5)
-                    prev_col_index = col_index
+                    else:
+                        # Ensure that the column index is different from the previous one
+                        while (col_index == selected_col_index and prev_row_index == selected_row_index) or (
+                                row_index == prev_row_index and col_index == prev_col_index):
+                            col_index = random.randint(0, 5)
+                        prev_col_index = col_index
+                        if col_index == selected_col_index:
+                            if no_of_appearance >= times_to_highlight:
+                                break
+                            else:
+                                no_of_appearance += 1
 
-                    for i in range(6):
-                        self.labels[i * 6 + col_index].setStyleSheet(
-                            'color: yellow' if self.labels[i * 6 + col_index] == selected_label else 'color: red')
-
-                time.sleep(1)  # Wait for 1 second
-                QApplication.processEvents()  # Process pending events to update UI
-
+                        for j in range(6):
+                            if self.labels[j * 6 + col_index] == selected_label:
+                                self.labels[j * 6 + col_index].setStyleSheet('color: yellow')
+                            else:
+                                self.labels[j * 6 + col_index].setStyleSheet('color: red')
+                    time.sleep(1)
+                    QApplication.processEvents()  # Process pending events to update UI
         time.sleep(2)  # Wait for 1 second before final highlighting
         self.highlighting_finished.emit()  # Emit signal when highlighting finishes
 
@@ -132,6 +146,7 @@ class StimulusGrid(QWidget):
         selected_label = [label for label in self.labels if label.text() == self.selected_letter][0]
         shuffled_labels = [selected_label] * times_to_highlight + [label for label in self.labels if
                                                                    label != selected_label]
+        no_of_appearance = 0
 
         # Shuffle the list of labels
         random.shuffle(shuffled_labels)
@@ -140,17 +155,21 @@ class StimulusGrid(QWidget):
         for round_num in range(total_round):
             # Shuffle the list of labels
             random.shuffle(shuffled_labels)
-
+            appeared_last = False
             # Highlight all labels with a delay of 1 second between each highlight
             for label in shuffled_labels:
-                if self.selected_letter == label.text():
+                if (self.selected_letter == label.text()) and (appeared_last == False):
                     label.setStyleSheet('color: yellow')
+                    appeared_last = True
+                    no_of_appearance += 1
                 else:
                     label.setStyleSheet('color: red')
+                    appeared_last = False
+
                 time.sleep(1)  # Wait for 1 second
                 QApplication.processEvents()  # Process pending events to update UI
                 label.setStyleSheet('color: white')  # Reset color to original
-
+        print(no_of_appearance)
         self.highlighting_finished.emit()  # Emit signal when highlighting finishes
 
     def resizeEvent(self, event):
@@ -161,6 +180,6 @@ class StimulusGrid(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    stimulus_grid = StimulusGrid('A', 1, 1, 'RC')
+    stimulus_grid = StimulusGrid('D', 5, 2, 'RC')
     stimulus_grid.showMinimized()
     sys.exit(app.exec_())

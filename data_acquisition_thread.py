@@ -1,4 +1,5 @@
 import csv
+import os
 import sys
 import time
 from datetime import datetime
@@ -7,12 +8,14 @@ from PyQt5.QtCore import QThread
 
 
 class DataAcquisitionThread(QThread):
-    def __init__(self, serial_port, board_id, letter):
+    def __init__(self, serial_port, board_id, letter, subject, pattern):
         super().__init__()
         self.board = None
         self.serial_port = serial_port
         self.board_id = board_id
         self.letter = letter
+        self.subject = subject
+        self.pattern = pattern
         self._running = True
 
     def run(self):
@@ -24,7 +27,8 @@ class DataAcquisitionThread(QThread):
         self.board.start_stream()
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"data_{timestamp}.csv"
+        filename = f"Data/Subject {self.subject}/{self.pattern}/{self.letter}/data_{timestamp}.csv"
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
 
         with open(filename, "w", newline='') as csvfile:
             writer = csv.writer(csvfile)
@@ -39,7 +43,7 @@ class DataAcquisitionThread(QThread):
                 while self._running:
                     data = self.board.get_current_board_data(256)
                     for i in range(len(data[0])):
-                        row = [str(float(data[channel][i])) for channel in range(32)]  # Convert to float first, then to string
+                        row = [str(float(data[channel][i])) for channel in eeg_channels]  # Convert to float first, then to string
                         row.append(self.letter)  # Append the same letter for each row
                         writer.writerow(row)
 
