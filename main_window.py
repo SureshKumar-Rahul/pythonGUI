@@ -52,7 +52,7 @@ class MainWindow(QWidget):
         self.label_pattern.setGeometry(30, 200, 200, 30)
         self.combo_patterns = QComboBox(self)
         self.combo_patterns.setGeometry(200, 200, 100, 30)
-        self.combo_patterns.addItems(['SC', 'RC'])
+        self.combo_patterns.addItems(['RC', 'SC'])
 
         # Subject
         self.subject_label = QLabel('Subject:', self)
@@ -85,11 +85,18 @@ class MainWindow(QWidget):
                                                              pattern=selected_pattern)
 
         self.data_acquisition_thread.start()
-        self.stimulus_grid.closing_signal.connect(self.close_all_windows)
         self.stimulus_grid.highlighting_finished.connect(self.close_all_windows)
+        self.stimulus_grid.closing_signal.connect(self.close_all_windows)
 
     def close_all_windows(self):
+        # Stop any running threads or timers here
+        if self.data_acquisition_thread:
+            # Schedule the stopping of data_acquisition_thread after 5 seconds
+            QTimer.singleShot(5000, self.stop_data_acquisition_thread)
         if self.stimulus_grid:
             self.stimulus_grid.close()
-            self.data_acquisition_thread.stop()
         self.close()
+
+    def stop_data_acquisition_thread(self):
+        if self.data_acquisition_thread:
+            self.data_acquisition_thread.stop()

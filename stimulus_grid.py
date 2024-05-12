@@ -61,10 +61,12 @@ class StimulusGrid(QWidget):
         self.timer.start(1)  # Update every 1000 ms (1 second)
 
     def closeEvent(self, event):
+        self.timer.stop()  # Stop the timer when closing the window
         self.closing_signal.emit()
 
     def highlight_random_location_rc(self):
         # Define the label you want to highlight more often
+        total_no_of_appearance = 0
         selected_label = [label for label in self.labels if label.text() == self.selected_letter][0]
         selected_index = self.labels.index(selected_label)
         times_to_highlight = self.selected_highlight
@@ -79,61 +81,65 @@ class StimulusGrid(QWidget):
         cols = list(range(6))
 
         for round in range(self.selected_round):
-            print(f"Round {round}")
-            # Shuffle the order of rows and columns separately
-            random.shuffle(rows)
-            random.shuffle(cols)
-            i = 0
-            prev_row_index = None
-            prev_col_index = None
-            no_of_appearance = 0
-            length = len(rows) + len(cols)
-            row_index = random.randint(0, 5)
-            col_index = random.randint(0, 5)
-            print(length)
-            while no_of_appearance < times_to_highlight:
-                for i in range(length):
-                    for label in self.labels:
-                        label.setStyleSheet('color: white')
+            if total_no_of_appearance < (times_to_highlight * self.selected_round):
+                no_of_appearance = 0
+                print(f"Round {round}")
+                # Shuffle the order of rows and columns separately
+                random.shuffle(rows)
+                random.shuffle(cols)
+                i = 0
+                prev_row_index = None
+                prev_col_index = None
+                length = len(rows) + len(cols)
+                row_index = random.randint(0, 5)
+                col_index = random.randint(0, 5)
+                while no_of_appearance < times_to_highlight:
+                    for i in range(length):
+                        for label in self.labels:
+                            label.setStyleSheet('color: white')
 
-                    # Highlight the row or column
-                    if i % 2 == 0:
-                        # Ensure that the row index is different from the previous one
-                        while (row_index == selected_row_index and prev_col_index == selected_col_index) or (
-                                row_index == prev_row_index and col_index == prev_col_index):
-                            row_index = random.randint(0, 5)
-                        prev_row_index = row_index
-                        if row_index == selected_row_index:
-                            if no_of_appearance >= times_to_highlight:
-                                break
-                            else:
-                                no_of_appearance += 1
+                        # Highlight the row or column
+                        if i % 2 == 0:
+                            # Ensure that the row index is different from the previous one
+                            while (row_index == selected_row_index and prev_col_index == selected_col_index) or (
+                                    row_index == prev_row_index and col_index == prev_col_index):
+                                row_index = random.randint(0, 5)
+                            prev_row_index = row_index
+                            if row_index == selected_row_index:
+                                if no_of_appearance >= times_to_highlight:
+                                    break
+                                else:
+                                    no_of_appearance += 1
+                                    total_no_of_appearance += 1
 
-                        for k in range(6):
-                            if self.labels[row_index * 6 + k] == selected_label:
-                                self.labels[row_index * 6 + k].setStyleSheet('color: yellow')
-                            else:
-                                self.labels[row_index * 6 + k].setStyleSheet('color: red')
+                            for k in range(6):
+                                if self.labels[row_index * 6 + k] == selected_label:
+                                    self.labels[row_index * 6 + k].setStyleSheet('color: yellow')
+                                else:
+                                    self.labels[row_index * 6 + k].setStyleSheet('color: red')
 
-                    else:
-                        # Ensure that the column index is different from the previous one
-                        while (col_index == selected_col_index and prev_row_index == selected_row_index) or (
-                                row_index == prev_row_index and col_index == prev_col_index):
-                            col_index = random.randint(0, 5)
-                        prev_col_index = col_index
-                        if col_index == selected_col_index:
-                            if no_of_appearance >= times_to_highlight:
-                                break
-                            else:
-                                no_of_appearance += 1
+                        else:
+                            # Ensure that the column index is different from the previous one
+                            while (col_index == selected_col_index and prev_row_index == selected_row_index) or (
+                                    row_index == prev_row_index and col_index == prev_col_index):
+                                col_index = random.randint(0, 5)
+                            prev_col_index = col_index
+                            if col_index == selected_col_index:
+                                if no_of_appearance >= times_to_highlight:
+                                    break
+                                else:
+                                    no_of_appearance += 1
+                                    total_no_of_appearance += 1
 
-                        for j in range(6):
-                            if self.labels[j * 6 + col_index] == selected_label:
-                                self.labels[j * 6 + col_index].setStyleSheet('color: yellow')
-                            else:
-                                self.labels[j * 6 + col_index].setStyleSheet('color: red')
-                    time.sleep(1)
-                    QApplication.processEvents()  # Process pending events to update UI
+                            for j in range(6):
+                                if self.labels[j * 6 + col_index] == selected_label:
+                                    self.labels[j * 6 + col_index].setStyleSheet('color: yellow')
+                                else:
+                                    self.labels[j * 6 + col_index].setStyleSheet('color: red')
+                        time.sleep(1)
+                        QApplication.processEvents()  # Process pending events to update UI
+            else:
+                break
         time.sleep(2)  # Wait for 1 second before final highlighting
         self.highlighting_finished.emit()  # Emit signal when highlighting finishes
 
@@ -144,6 +150,7 @@ class StimulusGrid(QWidget):
 
         # Define the label you want to highlight more often
         selected_label = [label for label in self.labels if label.text() == self.selected_letter][0]
+        print(selected_label)
         shuffled_labels = [selected_label] * times_to_highlight + [label for label in self.labels if
                                                                    label != selected_label]
         no_of_appearance = 0
