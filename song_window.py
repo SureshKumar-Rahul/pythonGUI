@@ -1,5 +1,8 @@
 import os
 import sys
+
+import brainflow
+import mne
 import pygame
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QComboBox
@@ -8,6 +11,29 @@ from brainflow import BoardIds
 from PyQt5 import QtGui
 
 from data_acquisition_thread_music import DataAcquisitionThread
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+def clean_data(df):
+    # Convert DataFrame to MNE RawArray
+    ch_names = [str(i) for i in range(1, 17)]
+    ch_types = ['eeg'] * 16
+    sfreq = 255  # Sampling frequency (Hz)
+    info = mne.create_info(ch_names=ch_names, sfreq=sfreq, ch_types=ch_types)
+    raw = mne.io.RawArray(df[ch_names].T.values, info)
+
+    # Apply filtering (1-40 Hz band-pass filter)
+    raw.filter(1., 40., fir_design='firwin')
+
+    # Detect and interpolate bad channels
+    raw.interpolate_bads(reset_bads=True)
+
+    # Convert MNE RawArray back to DataFrame
+    cleaned_data = raw.get_data().T
+    df_cleaned = pd.DataFrame(cleaned_data, columns=ch_names)
+
+    return df_cleaned
 
 
 class MainWindow(QMainWindow):
@@ -27,6 +53,9 @@ class MainWindow(QMainWindow):
         self.data_acquisition_thread = None  # Initialize EEG data acquisition thread
         self.song_duration = 30
         self.setup_ui()
+
+        if self.data_acquisition_thread:
+            self.data_acquisition_thread.plot_signal.connect(self.generate_and_save_plot)
 
     def setup_ui(self):
         # Play button
@@ -55,7 +84,7 @@ class MainWindow(QMainWindow):
         self.song_duration_label.setGeometry(50, 200, 100, 30)
         self.song_time = QComboBox(self)
         self.song_time.setGeometry(150, 200, 100, 30)
-        self.song_time.addItems(['30', '60'])
+        self.song_time.addItems(['60'])
 
         # Status label
         self.status_label = QLabel("Ready", self)
@@ -67,14 +96,10 @@ class MainWindow(QMainWindow):
 
         # Image label
         self.image_label = QLabel(self)
-        self.image_label.setGeometry(200,400, 400, 400)  # Adjust position and size as needed
+        self.image_label.setGeometry(200, 400, 400, 400)  # Adjust position and size as needed
 
         self.break_timer.timeout.connect(self.update_break_time)
         self.track_timer.timeout.connect(self.play_next_track)
-
-    def update_visualizer(self, eeg_data):
-        # Update the visualizer with EEG data
-        self.eeg_visualizer.update_plot(eeg_data)
 
     def load_tracks(self):
         tracks = []
@@ -100,8 +125,8 @@ class MainWindow(QMainWindow):
             self.status_label.setText(f"Playing: {track}")
             # Start EEG data acquisition when a track starts playing
             if self.data_acquisition_thread is None or not self.data_acquisition_thread.isRunning():
-                self.data_acquisition_thread = DataAcquisitionThread(serial_port="COM5",
-                                                                     board_id=2,
+                self.data_acquisition_thread = DataAcquisitionThread(serial_port="COM9",
+                                                                     board_id=BoardIds.CYTON_DAISY_BOARD.value,
                                                                      subject=int(self.subject.currentText()),
                                                                      current_track_index=self.current_track_index)
 
@@ -110,17 +135,45 @@ class MainWindow(QMainWindow):
             self.current_track_index += 1
             self.song_duration = int(self.song_time.currentText())
             self.break_timer.start(self.song_duration * 1000)  # Start break timer
+
+
         else:
             self.status_label.setText("All tracks played")
             self.break_label.setText("Ready for another round?")
             if self.data_acquisition_thread and self.data_acquisition_thread.isRunning():
                 self.data_acquisition_thread.stop()
 
+    def generate_and_save_plot(self, file_path):
+        output_base_dir = 'EEG_Plots_RAW'
+        os.makedirs(output_base_dir, exist_ok=True)
+        df = pd.read_csv(file_path)
+        df_cleaned = clean_data(df)
+        fig, axes = plt.subplots(nrows=16, ncols=1, figsize=(12, 24), sharex=True)
+        for i in range(1, 17):
+            ax = axes[i - 1]
+            ax.plot(df_cleaned.index, df_cleaned[str(i)], label=f'Electrode {i}')
+            ax.set_ylabel(f'Electrode {i}')
+            ax.legend(loc='upper right')
+        axes[-1].set_xlabel('Sample Index')
+        output_dir = os.path.join(output_base_dir, f'Subject {self.subject.currentText()}',
+                                  f'track{self.current_track_index}')
+        os.makedirs(output_dir, exist_ok=True)
+        output_file_path = os.path.join(output_dir, f'{os.path.basename(file_path).replace(".csv", ".png")}')
+        plt.savefig(output_file_path)
+        plt.close()
+        print(f'Completed')
+
     def update_break_time(self):
+
         self.break_timer.stop()
         self.stop_music()
         self.break_label.setText(f"Taking a break")
         self.track_timer.start(self.break_duration * 1000)
+
+        if self.data_acquisition_thread and self.data_acquisition_thread.isRunning():
+            file_path = self.data_acquisition_thread.latest_file_path
+            if file_path:  # Check if file path exists
+                self.generate_and_save_plot(file_path)  # Emit signal to generate and save plot
 
         # Stop EEG data acquisition during the break
         if self.data_acquisition_thread and self.data_acquisition_thread.isRunning():

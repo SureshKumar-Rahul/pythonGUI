@@ -8,6 +8,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 
 class DataAcquisitionThread(QThread):
+
     def __init__(self, serial_port, board_id, subject, current_track_index):
         super().__init__()
         self.tracks_folder = "audio"  # Folder containing audio tracks
@@ -18,6 +19,10 @@ class DataAcquisitionThread(QThread):
         self.subject = subject
         self.current_track_index = current_track_index
         self._running = True
+
+        plot_signal = pyqtSignal(str)
+        self.latest_file_path = None  # Variable to store the latest file path
+
 
     def load_tracks(self):
         tracks = []
@@ -38,6 +43,7 @@ class DataAcquisitionThread(QThread):
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         filename = f"Data/Music/Subject {self.subject}/{self.tracks[self.current_track_index]}/data_{timestamp}.csv"
         os.makedirs(os.path.dirname(filename), exist_ok=True)
+        self.latest_file_path = filename
 
         with open(filename, "w", newline='') as csvfile:
             writer = csv.writer(csvfile)
@@ -48,14 +54,16 @@ class DataAcquisitionThread(QThread):
             headers.append("Track")  # Add a new header for the letter column
             writer.writerow(headers)
 
+
             try:
                 while self._running:
-                    data = self.board.get_current_board_data(255)
+                    data = self.board.get_board_data(250*1) ## (250 Hz @ 1sec) ##
                     for i in range(len(data[0])):
                         row = [str(float(data[channel][i])) for channel in
                                eeg_channels]  # Convert to float first, then to string
                         row.append(self.current_track_index)  # Append the same letter for each row
                         writer.writerow(row)
+
 
                     time.sleep(1)
             finally:

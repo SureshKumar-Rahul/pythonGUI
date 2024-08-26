@@ -41,7 +41,7 @@ class DataAcquisitionThread(QThread):
 
             try:
                 while self._running:
-                    data = self.board.get_current_board_data(255)
+                    data = self.board.get_board_data(250*1)
                     for i in range(len(data[0])):
                         row = [str(float(data[channel][i])) for channel in eeg_channels]  # Convert to float first, then to string
                         row.append(self.letter)  # Append the same letter for each row
